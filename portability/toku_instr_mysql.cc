@@ -1,4 +1,20 @@
-#ifdef MYSQL_TOKUDB_ENGINE
+#if defined(MYSQL_TOKUDB_ENGINE) && MYSQL_TOKUDB_ENGINE != 0
+#pragma message ("MYSQL_TOKUDB_ENGINE!=0")
+#endif
+
+#if defined(TOKU_MYSQL_WITH_PFS) && TOKU_MYSQL_WITH_PFS != 0
+#pragma message ("TOKU_MYSQL_WITH_PFS!=0")
+#endif
+
+#if defined(MYSQL_TOKUDB_ENGINE) && MYSQL_TOKUDB_ENGINE == 0
+#pragma message ("MYSQL_TOKUDB_ENGINE=0")
+#endif
+
+#if defined(TOKU_MYSQL_WITH_PFS) && TOKU_MYSQL_WITH_PFS == 0
+#pragma message ("TOKU_MYSQL_WITH_PFS=0")
+#endif
+
+#ifdef TOKU_MYSQL_WITH_PFS
 #include "toku_portability.h"
 #include "toku_pthread.h"
 

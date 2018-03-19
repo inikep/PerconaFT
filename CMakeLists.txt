@@ -17,11 +17,12 @@ ENDIF()
 
 # detect when we are being built as a subproject
 if (DEFINED MYSQL_PROJECT_NAME_DOCSTRING)
-  add_definitions( -DMYSQL_TOKUDB_ENGINE=1)
+  add_definitions("-DMYSQL_TOKUDB_ENGINE=1")
   # Extended PFS instrumentation:
   # -DTOKU_PFS_MUTEX_EXTENDED_CACHETABLEMMUTEX=1
+  MESSAGE("WITH_PERFSCHEMA_STORAGE_ENGINE=${WITH_PERFSCHEMA_STORAGE_ENGINE}")
   if (WITH_PERFSCHEMA_STORAGE_ENGINE)
-    add_definitions(-DTOKU_MYSQL_WITH_PFS)
+    add_definitions("-DTOKU_MYSQL_WITH_PFS=1")
   endif ()
   include_directories(${CMAKE_SOURCE_DIR}/include)
   if ((CMAKE_BUILD_TYPE MATCHES "Debug") AND
