@@ -1,0 +1,125 @@
+# Ubuntu 14.04
+dist: trusty
+sudo: required
+language: cpp
+
+cache:
+  ccache: true
+  timeout: 600
+
+env:
+  global:
+    - CCACHE_DIR=$HOME/.ccache
+    - CCACHE_COMPRESS=1
+    - CCACHE_COMPRESSLEVEL=9
+    - CCACHE_MAXSIZE=500Mi
+    - CCACHE_CPP2=1
+
+matrix:
+  include:
+    # Common
+    - env: COMMAND=clang-test
+      script:
+        - wget https://llvm.org/svn/llvm-project/cfe/trunk/tools/clang-format/clang-format-diff.py
+        - chmod a+x clang-format-diff.py
+        - git diff -U0 --no-color HEAD^1 | ./clang-format-diff.py -p1 >_GIT_DIFF
+        - '[ ! -s _GIT_DIFF ] && { echo The last git commit is clang-formatted; travis_terminate 0; } || { cat _GIT_DIFF; travis_terminate 1; }'
+
+
+    # 1
+    - env:              BUILD=Debug
+      compiler: clang
+      os: osx
+      osx_image: xcode8
+    - env:              BUILD=Debug
+      compiler: clang
+      os: osx
+      osx_image: xcode7.3
+    - env:              BUILD=Debug
+      compiler: clang
+      os: osx
+      osx_image: xcode6.4
+    # 2
+    - env: VERSION=6.0  BUILD=RelWithDebInfo
+      compiler: clang
+    # 3
+    - env: VERSION=5.0  BUILD=Debug
+      compiler: clang
+    # 4
+    - env: VERSION=4.0  BUILD=Debug
+      compiler: clang
+    # 5
+    - env: VERSION=8    BUILD=Debug
+      compiler: gcc
+    # 6
+    - env: VERSION=7    BUILD=Debug
+      compiler: gcc
+    # 7
+    - env: VERSION=6    BUILD=Debug
+      compiler: gcc
+    # 8
+    - env: VERSION=5    BUILD=Debug
+      compiler: gcc
+    # 9
+    - env: VERSION=4.8  BUILD=Debug
+      compiler: gcc
+
+
+script:
+  - JOB_NUMBER=$(echo $TRAVIS_JOB_NUMBER | sed -e 's:[0-9][0-9]*\.\(.*\):\1:');
+    echo --- JOB_NUMBER=$JOB_NUMBER TRAVIS_COMMIT=$TRAVIS_COMMIT TRAVIS_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE TRAVIS_REPO_SLUG=$TRAVIS_REPO_SLUG TRAVIS_BRANCH=$TRAVIS_BRANCH TRAVIS_EVENT_TYPE=$TRAVIS_EVENT_TYPE TRAVIS_PULL_REQUEST=$TRAVIS_PULL_REQUEST TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH
+
+  - echo --- Configure required LLVM and Ubuntu Toolchain repositories;
+    if [[ "$TRAVIS_OS_NAME" == "linux" ]] && [[ "$CC" == "clang" ]]; then
+       PACKAGES="llvm-$VERSION-dev $PACKAGES";
+       curl -sSL "http://apt.llvm.org/llvm-snapshot.gpg.key" | sudo -E apt-key add -;
+       echo "deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-$VERSION main" | sudo tee -a /etc/apt/sources.list > /dev/null;
+    fi;
+    if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+       sudo -E apt-add-repository -y "ppa:ubuntu-toolchain-r/test";
+       sudo -E apt-add-repository -y "ppa:jonathonf/binutils";
+       sudo -E apt-add-repository -y "ppa:jonathonf/gcc-5.5";
+       sudo -E apt-add-repository -y "ppa:jonathonf/gcc-6.4";
+       sudo -E apt-add-repository -y "ppa:jonathonf/gcc-7.3";
+       sudo -E apt-add-repository -y "ppa:jonathonf/gcc-8.0";
+    fi;
+
+  - echo --- Update list of packages and download dependencies;
+    if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+       CC=$CC-$VERSION;
+       CXX=$CXX-$VERSION;
+       sudo -E apt-get -yq update >> ~/apt-get-update.log 2>&1;
+       sudo -E apt-get -yq --no-install-suggests --no-install-recommends install $CXX $PACKAGES cmake || travis_terminate 1;
+       sudo ln -s $(which ccache) /usr/lib/ccache/$CC;
+       sudo ln -s $(which ccache) /usr/lib/ccache/$CXX || echo;
+    else
+       brew update;
+       brew install ccache;
+       brew link ccache;
+       export PATH="/usr/local/opt/ccache/libexec:$PATH";
+    fi
+
+  - mkdir bin; cd bin;
+  - $CC -v
+  - $CXX -v
+  - ccache --version
+  - ccache --print-config;
+    ccache --zero-stats;
+
+  - echo --- Set cmake parameters;
+    CMAKE_OPT="
+      -DCMAKE_BUILD_TYPE=$BUILD
+      -DBUILD_TESTING=OFF
+      -DUSE_VALGRIND=OFF
+      -DCMAKE_INSTALL_PREFIX=../prefix/
+    ";
+
+  - echo --- Perform Debug or RelWithDebInfo compilation;
+    echo --- CMAKE_OPT=\"$CMAKE_OPT\";
+    echo --- ENV_VAR_CMAKE_OPT=\"$ENV_VAR_CMAKE_OPT\";
+    cmake ..
+      $CMAKE_OPT
+      $ENV_VAR_CMAKE_OPT
+  - make -j2 || travis_terminate 1
+  - ccache --show-stats
+
